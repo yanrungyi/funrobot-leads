@@ -93,7 +93,7 @@
   .s3 { background: #ccfbf1; color: #0f766e; } .s4 { background: #dcfce7; color: #15803d; } .s5 { background: #f3f4f6; color: #6b7280; }
   .chip.kid { background: #fef3c7; color: #92400e; } .chip.course { background: #e0f2fe; color: #075985; }
 
-  /* 新生名單篩選 */
+  /* 問課學生區、體驗課區的篩選 */
   .filters { padding: 12px 12px 0; display: grid; gap: 8px; }
   .filters input, .filters select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   .filters .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -148,11 +148,33 @@
   .composer .bar .btn { margin-left: auto; }
   .confirm { margin-top: 8px; background: var(--brand-soft); border: 1px solid #fcd5b5; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
   .confirm .bar { justify-content: flex-end; }
-  .thread { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-  .bubble { max-width: 80%; padding: 8px 12px; border-radius: 14px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
-  .bubble.in { background: #f3f4f6; align-self: flex-start; border-bottom-left-radius: 4px; }
-  .bubble.out { background: #dcfce7; align-self: flex-end; border-bottom-right-radius: 4px; }
-  .bubble .meta { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  /* 對話：配色接近 LINE（藍灰底、家長白色泡泡、我方綠色泡泡） */
+  .chat .composer { background: #f7f7f7; border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; padding: 10px; }
+  .chat .composer textarea { background: #fff; }
+  .chat .composer .btn { background: #06c755; }
+  .thread { display: flex; flex-direction: column; gap: 10px; background: #8cabd8; padding: 14px 12px; min-height: 360px;
+    border-radius: 0 0 var(--radius) var(--radius); }
+  .thread .muted, .thread .err { color: #fff; text-align: center; }
+  .msg-line { display: flex; align-items: flex-end; gap: 6px; max-width: 85%; }
+  .msg-line.in { align-self: flex-start; }
+  .msg-line.out { align-self: flex-end; flex-direction: row-reverse; }
+  .bubble { padding: 8px 12px; border-radius: 18px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: #111; }
+  .msg-line.in .bubble { background: #fff; border-top-left-radius: 4px; }
+  .msg-line.out .bubble { background: #8de055; border-top-right-radius: 4px; }
+  .msg-time { font-size: 10px; color: #f1f5f9; white-space: nowrap; line-height: 1.3; }
+  .msg-line.out .msg-time { text-align: right; }
+
+  /* 可收折區塊 */
+  .fold { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+  .fold > summary { list-style: none; cursor: pointer; padding: 10px 14px; display: flex; gap: 10px; align-items: center; font-weight: 600; font-size: 14px; }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '▸'; margin-left: auto; color: var(--muted); transition: transform .15s; }
+  .fold[open] > summary::after { transform: rotate(90deg); }
+  .fold > summary .sum { font-weight: 400; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fold > summary .sum.warn { color: #92400e; font-weight: 600; }
+  .fold-body { padding: 0 14px 14px; }
+  .fold-body.formbox { padding-top: 10px; margin: 0 14px 14px; border-radius: 8px; border: 1px solid #fcd5b5; }
+  .filters .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
@@ -184,7 +206,8 @@
   <nav class="topbar">
     <span class="logo">FUN學 招生追蹤</span>
     <button class="tab on" data-view="todo">今日待辦<span class="badge" id="n-todo">0</span></button>
-    <button class="tab" data-view="leads">新生名單</button>
+    <button class="tab" data-view="ask">問課學生<span class="badge zero" id="n-ask">0</span></button>
+    <button class="tab" data-view="trial">體驗課<span class="badge zero" id="n-trial">0</span></button>
     <button class="tab" data-view="inbox">在學訊息<span class="badge" id="n-inbox">0</span></button>
     <div class="right">
       <span class="muted" id="loaded-at"></span>
@@ -200,12 +223,12 @@
         <div class="todo-head"><h2>今天要處理的事</h2><div class="muted" style="font-size:13px">由上到下依緊急程度排列，點名字看詳細資料</div></div>
         <div id="todo-groups"></div>
       </div>
-      <!-- 新生名單 -->
+      <!-- 問課學生區、體驗課區（共用同一個清單，依分頁切換內容） -->
       <div id="view-leads" class="hidden">
+        <div class="todo-head"><h2 id="leads-title"></h2><div class="muted" style="font-size:13px" id="leads-desc"></div></div>
         <div class="filters">
           <input id="f-q" type="search" placeholder="🔍 搜尋家長、孩子、訊息">
-          <div class="three">
-            <select id="f-identity"></select>
+          <div class="two">
             <select id="f-campus"></select>
             <select id="f-course"></select>
           </div>
@@ -235,7 +258,8 @@
         <div class="d-tags" id="d-tags"></div>
         <div class="d-alert hidden" id="d-alert"></div>
 
-        <div class="section">
+        <!-- 進度：只有非在學學生才需要 -->
+        <div class="section" id="d-stage-sec">
           <h3>進度（點一下就會儲存）</h3>
           <div class="stepper" id="d-stepper"></div>
           <div class="stage-extra">
@@ -244,9 +268,10 @@
           </div>
         </div>
 
-        <div class="section">
-          <h3>體驗課</h3>
-          <div class="card">
+        <!-- 可收折的區塊：平常收起來，畫面留給對話 -->
+        <details class="fold" id="d-trial-sec">
+          <summary><span>📅 體驗課</span><span class="sum" id="d-trial-sum"></span></summary>
+          <div class="fold-body">
             <div class="grid2">
               <label class="field">日期<input id="d-trial" type="date"></label>
               <label class="field">時間<input id="d-trial-time" type="time"></label>
@@ -254,15 +279,33 @@
             <div class="hint" id="d-trial-src"></div>
             <div class="save-row"><button class="btn small" id="d-trial-save">儲存體驗課時間</button><span class="ok" id="d-trial-ok"></span><span class="err" id="d-trial-err"></span></div>
           </div>
-        </div>
+        </details>
 
-        <div class="section hidden" id="d-form-sec">
-          <h3 id="d-form-title">體驗課表單資料</h3>
-          <div class="card formbox" id="d-form"></div>
-        </div>
+        <details class="fold hidden" id="d-form-sec">
+          <summary><span id="d-form-title">🔥 體驗課表單資料</span><span class="sum">電話可直接撥打</span></summary>
+          <div class="fold-body formbox" id="d-form"></div>
+        </details>
 
-        <div class="section">
-          <h3>對話（最新在最上面）</h3>
+        <details class="fold" id="d-info-sec">
+          <summary><span>👤 學員資料</span><span class="sum" id="d-info-sum"></span></summary>
+          <div class="fold-body">
+            <div class="grid2">
+              <label class="field">稱呼<input id="d-nickname" placeholder="例：小明媽媽"></label>
+              <label class="field">孩子姓名（多位用「、」分隔）<input id="d-children"></label>
+              <label class="field">身分<select id="d-identity"></select></label>
+              <label class="field">校區<input id="d-campus" list="campus-list"></label>
+              <label class="field">年齡<input id="d-age"></label>
+              <div class="field full">課程類別<div class="checks" id="d-courses"></div></div>
+              <label class="field full">備註<textarea id="d-note"></textarea></label>
+            </div>
+            <datalist id="campus-list"></datalist>
+            <div class="save-row"><button class="btn small" id="d-save">儲存學員資料</button><span class="ok" id="d-ok"></span><span class="err" id="d-err"></span></div>
+          </div>
+        </details>
+
+        <!-- 對話：主要區塊，配色接近 LINE -->
+        <div class="section chat">
+          <h3>💬 對話（最新在最上面）</h3>
           <div class="composer">
             <textarea id="r-text" placeholder="輸入要傳給家長的訊息，會以官方帳號傳到家長的 LINE…"></textarea>
             <div class="bar">
@@ -279,23 +322,6 @@
           </div>
           <div class="thread" id="d-thread"></div>
         </div>
-
-        <div class="section">
-          <h3>家長資料</h3>
-          <div class="card">
-            <div class="grid2">
-              <label class="field">稱呼<input id="d-nickname" placeholder="例：小明媽媽"></label>
-              <label class="field">孩子姓名（多位用「、」分隔）<input id="d-children"></label>
-              <label class="field">身分<select id="d-identity"></select></label>
-              <label class="field">校區<input id="d-campus" list="campus-list"></label>
-              <label class="field">年齡<input id="d-age"></label>
-              <div class="field full">課程類別<div class="checks" id="d-courses"></div></div>
-              <label class="field full">備註<textarea id="d-note"></textarea></label>
-            </div>
-            <datalist id="campus-list"></datalist>
-            <div class="save-row"><button class="btn small" id="d-save">儲存家長資料</button><span class="ok" id="d-ok"></span><span class="err" id="d-err"></span></div>
-          </div>
-        </div>
       </div>
     </section>
   </div>
@@ -308,8 +334,7 @@
   const DEFAULT_SENDER = '顏老師';
   const MAIN_STAGES = ['詢問中', '已回覆', '已約試聽', '已試聽', '已報名'];
   const DAY = 86400000, HOUR = 3600000, URGENT_HOURS = 12;
-  const LEAD_VIEW = '__lead';
-  const state = { data: null, view: 'todo', currentId: null, stageFilter: '' };
+  const state = { data: null, zone: 'ask', currentId: null, stageFilter: '' };
   const $ = (id) => document.getElementById(id);
 
   function esc(s) {
@@ -513,44 +538,73 @@
       : '<div class="all-clear">🎉 目前沒有待辦事項</div>';
   }
 
-  // ── 新生名單 ──
+  // ── 問課學生區、體驗課區 ──
+  // 體驗課區：已約試聽／已試聽／已報名，或家長填了表單、提出體驗時間還在等安排
+  const inTrialZone = (l) => l.identity !== '在學' &&
+    (['已約試聽', '已試聽', '已報名'].indexOf(l.stage) >= 0 || (isWaiting(l) && (l.formTs || l.trialSource === '家長提出')));
+  // 問課學生區：其餘的問課、未分類家長
+  const inAskZone = (l) => (l.identity === '問課' || l.identity === '未分類') && !inTrialZone(l);
+  const ZONES = {
+    ask: {
+      title: '問課學生', desc: '詢問課程、還沒約體驗課的家長。需處理的排前面，其餘最新在最上面。', test: inAskZone,
+      chips: [['', '全部'], ['__todo', '需處理'], ['詢問中', '詢問中'], ['已回覆', '已回覆'], ['暫不報名', '暫不報名'], ['__unclassified', '未分類']],
+    },
+    trial: {
+      title: '體驗課', desc: '待安排、已約好、已體驗的家長。需處理的排前面，其餘依體驗日期（最新在最上面）。', test: inTrialZone,
+      chips: [['', '全部'], ['__todo', '需處理'], ['__wait', '待安排'], ['已約試聽', '已約試聽'], ['已試聽', '已試聽'], ['已報名', '已報名']],
+    },
+  };
+  function chipMatch(l, v) {
+    if (!v) return true;
+    if (v === '__todo') return !!priority(l);
+    if (v === '__unclassified') return l.identity === '未分類';
+    if (v === '__wait') return isWaiting(l);
+    return l.stage === v;
+  }
+
   function fillSelects() {
     const d = state.data;
     const keep = (id, html, def) => { const v = $(id).value; $(id).innerHTML = html; $(id).value = v || def; if ($(id).selectedIndex < 0) $(id).value = def; };
-    keep('f-identity', `<option value="${LEAD_VIEW}">問課＋未分類</option><option value="">全部身分</option>` +
-      d.identities.map((v) => `<option>${esc(v)}</option>`).join(''), LEAD_VIEW);
     keep('f-campus', '<option value="">全部校區</option>' + d.campuses.map((v) => `<option>${esc(v)}</option>`).join(''), '');
     keep('f-course', '<option value="">全部課程</option>' + (d.courses || []).map((v) => `<option>${esc(v)}</option>`).join(''), '');
     $('d-identity').innerHTML = d.identities.map((v) => `<option>${esc(v)}</option>`).join('');
     $('campus-list').innerHTML = d.campuses.map((c) => `<option value="${esc(c)}">`).join('');
   }
-  ['f-identity', 'f-campus', 'f-course'].forEach((id) => $(id).addEventListener('change', renderLeads));
+  ['f-campus', 'f-course'].forEach((id) => $(id).addEventListener('change', renderLeads));
   $('f-q').addEventListener('input', renderLeads);
 
-  function baseLeads() {
-    const idf = $('f-identity').value, cf = $('f-campus').value, co = $('f-course').value;
+  function baseLeads(zone) {
+    const cf = $('f-campus').value, co = $('f-course').value;
     const q = $('f-q').value.trim().toLowerCase();
-    return state.data.leads.filter((l) =>
-      (idf === LEAD_VIEW ? (l.identity === '問課' || l.identity === '未分類') : (!idf || l.identity === idf)) &&
+    return state.data.leads.filter((l) => zone.test(l) &&
       (!cf || l.campus.indexOf(cf) >= 0) &&
       (!co || listOf(l.courses).indexOf(co) >= 0) &&
       (!q || [l.nickname, l.children, l.name, l.lastMessage, l.note, l.age].join(' ').toLowerCase().indexOf(q) >= 0));
   }
 
+  /** 體驗課區排序用：體驗日期，沒有就用表單或最後訊息時間 */
+  const trialSortKey = (l) => l.trialDate ? new Date(`${l.trialDate}T${l.trialTime || '00:00'}:00`).getTime() : (l.formTs || l.lastTs);
+
   function renderLeads() {
-    const base = baseLeads();
-    const stages = [['', '全部'], ['__todo', '需處理'], ...state.data.stages.map((s) => [s, s])];
-    $('stage-chips').innerHTML = stages.map(([v, label]) => {
-      const n = v === '' ? base.length : v === '__todo' ? base.filter((l) => priority(l)).length : base.filter((l) => l.stage === v).length;
-      return `<button class="${state.stageFilter === v ? 'on' : ''}" data-s="${esc(v)}">${esc(label)}<b>${n}</b></button>`;
-    }).join('');
-    const sf = state.stageFilter;
+    // 分頁上的數字：各區需處理的人數
+    ['ask', 'trial'].forEach((k) => {
+      const n = state.data.leads.filter((l) => ZONES[k].test(l) && priority(l)).length;
+      $('n-' + k).textContent = n;
+      $('n-' + k).classList.toggle('zero', !n);
+    });
+    const zone = ZONES[state.zone || 'ask'];
+    $('leads-title').textContent = zone.title;
+    $('leads-desc').textContent = zone.desc;
+    const base = baseLeads(zone);
+    $('stage-chips').innerHTML = zone.chips.map(([v, label]) =>
+      `<button class="${state.stageFilter === v ? 'on' : ''}" data-s="${esc(v)}">${esc(label)}<b>${base.filter((l) => chipMatch(l, v)).length}</b></button>`).join('');
+    const isTrial = zone === ZONES.trial;
     const rows = base
-      .filter((l) => !sf || (sf === '__todo' ? priority(l) : l.stage === sf))
-      .sort((a, b) => priority(b) - priority(a) || b.lastTs - a.lastTs);
-    $('count').textContent = `共 ${rows.length} 位；需處理的排前面，其餘依最後訊息時間（最新在最上面）`;
+      .filter((l) => chipMatch(l, state.stageFilter))
+      .sort((a, b) => priority(b) - priority(a) || (isTrial ? trialSortKey(b) - trialSortKey(a) : b.lastTs - a.lastTs));
+    $('count').textContent = `共 ${rows.length} 位`;
     $('lead-list').innerHTML = rows.length
-      ? rows.map((l) => rowHtml(l, topReason(l), l.lastAt, l.lastMessage)).join('')
+      ? rows.map((l) => rowHtml(l, topReason(l), isTrial && l.trialDate ? '體驗 ' + trialText(l) : l.lastAt, l.lastMessage)).join('')
       : '<div class="all-clear">沒有符合條件的家長</div>';
   }
   $('stage-chips').addEventListener('click', (e) => {
@@ -578,9 +632,13 @@
 
   // ── 切換分頁、點清單 ──
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
-    state.view = t.dataset.view;
+    const view = t.dataset.view;
     document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t));
-    ['todo', 'leads', 'inbox'].forEach((v) => $('view-' + v).classList.toggle('hidden', v !== state.view));
+    // 問課學生、體驗課共用 view-leads
+    const pane = view === 'ask' || view === 'trial' ? 'leads' : view;
+    if (pane === 'leads' && state.zone !== view) { state.zone = view; state.stageFilter = ''; }
+    ['todo', 'leads', 'inbox'].forEach((v) => $('view-' + v).classList.toggle('hidden', v !== pane));
+    if (pane === 'leads') renderLeads();
   }));
   [$('pane-list'), $('urgent')].forEach((el) => el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-id]');
@@ -595,6 +653,11 @@
     $('r-err').textContent = '';
     hideConfirm();
     ['d-ok', 'd-err', 'd-trial-ok', 'd-trial-err', 'd-stage-msg'].forEach((id) => { $(id).textContent = ''; });
+    // 收折區塊：學員資料平常收起；體驗課、表單在需要處理時才展開
+    const l = lead(userId);
+    $('d-info-sec').open = false;
+    $('d-trial-sec').open = !!l && l.identity !== '在學' && (!!formReason(l) || l.stage === '已約試聽');
+    $('d-form-sec').open = !!l && isHotForm(l);
     renderDetail();
     renderAll(); // 更新清單選取狀態
     $('pane-detail').classList.add('open');
@@ -615,6 +678,17 @@
     const [why, color] = topReason(l);
     $('d-alert').className = 'd-alert ' + color + (why ? '' : ' hidden');
     $('d-alert').textContent = why;
+
+    // 在學學生不需要進度和體驗課
+    const enrolled = l.identity === '在學';
+    $('d-stage-sec').classList.toggle('hidden', enrolled);
+    $('d-trial-sec').classList.toggle('hidden', enrolled);
+    $('d-trial-sum').className = 'sum' + (l.trialSource === '家長提出' && isWaiting(l) ? ' warn' : '');
+    $('d-trial-sum').textContent = l.trialDate
+      ? trialText(l) + (l.trialSource === '家長提出' && isWaiting(l) ? '（家長提出，待確認）' : '')
+      : '尚未安排';
+    $('d-info-sum').textContent = [l.nickname, listOf(l.children).join('、'), listOf(l.courses).join('、'), l.campus, l.age]
+      .filter(String).join('・') || '點開填寫稱呼、孩子、課程';
 
     // 進度
     const cur = MAIN_STAGES.indexOf(l.stage);
@@ -640,7 +714,7 @@
       }).join('');
     }
 
-    // 家長資料
+    // 學員資料
     $('d-nickname').value = l.nickname;
     $('d-children').value = l.children || '';
     $('d-identity').value = l.identity;
@@ -695,8 +769,12 @@
     try {
       const msgs = await call('getMessages', getToken(), userId);
       if (state.currentId !== userId) return;
+      // LINE 樣式：家長在左（白色），我方在右（綠色），時間在泡泡旁邊
       $('d-thread').innerHTML = msgs.length ? msgs.map((m) => `
-        <div class="bubble ${m.outgoing ? 'out' : 'in'}"><span class="meta">${m.outgoing ? '↩ ' + esc(m.sender || '網頁回覆') + '・' : ''}${esc(m.at)}</span>${esc(m.content)}</div>`).join('')
+        <div class="msg-line ${m.outgoing ? 'out' : 'in'}">
+          <div class="bubble">${esc(m.content)}</div>
+          <div class="msg-time">${m.outgoing ? esc(m.sender || '網頁回覆') + '<br>' : ''}${esc(m.at.slice(5))}</div>
+        </div>`).join('')
         : '<div class="muted">還沒有訊息紀錄</div>';
     } catch (err) {
       $('d-thread').innerHTML = `<div class="err">讀取失敗：${esc(err.message)}</div>`;
