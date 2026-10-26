@@ -56,7 +56,7 @@
   .stat.active { background: var(--c); color: #fff; border-color: var(--c); }
   .stat.active b { color: #fff; }
   .stat.active .dot { background: #fff; }
-  .filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .filters { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
   .filters select, .filters input { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); width: 100%; min-width: 0; }
   .count { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
   .list { display: grid; gap: 8px; }
@@ -131,6 +131,14 @@
   header .tab b.zero { background: #ccc; }
   .tag.pending { background: #fbe3e0; color: var(--warn); font-weight: 600; }
   .tag.child { background: #fef3c7; color: #92400e; font-weight: 600; }
+  .tag.course { background: #e0f2fe; color: #075985; font-weight: 600; }
+  .course-pick > span { font-size: 12px; color: var(--muted); }
+  .course-pick > div { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; font-size: 14px; }
+  .course-pick label { display: flex; align-items: center; gap: 4px; color: var(--ink); }
+  .reply-row .sender { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 13px; color: var(--muted); }
+  .reply-row select { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .confirm-box { margin-top: 8px; padding: 10px 12px; border: 1px solid #fcd5b5; background: #fff4ec; border-radius: 8px; font-size: 14px; }
+  .confirm-box .reply-row { justify-content: flex-end; }
   .form .hint { font-size: 12px; color: #92400e; }
   .form .hint:empty { display: none; }
   .tag.done { background: #dcfce7; color: #15803d; }
@@ -178,6 +186,7 @@
     <div class="filters">
       <select id="f-identity"></select>
       <select id="f-campus"></select>
+      <select id="f-course"></select>
       <select id="f-stage"></select>
       <input id="f-q" type="search" placeholder="搜尋名稱、訊息、備註">
     </div>
@@ -214,6 +223,7 @@
       </label>
       <label>稱呼（例：守樂爸爸）<input id="d-nickname" placeholder="系統內顯示的名稱"></label>
       <label>孩子姓名（多位用「、」分隔）<input id="d-children" placeholder="系統會從訊息自動判斷"></label>
+      <div class="full course-pick"><span>課程類別</span><div id="d-courses"></div></div>
       <label>身分<select id="d-identity"></select></label>
       <label>校區<input id="d-campus" list="campus-list"></label>
       <label>年齡<input id="d-age"></label>
@@ -232,8 +242,22 @@
     <div class="reply">
       <textarea id="r-text" placeholder="輸入要傳給家長的訊息…"></textarea>
       <div class="reply-row">
-        <input id="r-sender" placeholder="回覆者（例：王老師）" maxlength="20">
+        <label class="sender">回覆者
+          <select id="r-sender">
+            <option>顏老師</option>
+            <option>陳老師</option>
+            <option>雅鎂</option>
+          </select>
+        </label>
         <button class="btn" id="r-send">傳送</button>
+      </div>
+      <!-- 傳送前確認（不用瀏覽器內建的 confirm 視窗，有些瀏覽器會擋掉） -->
+      <div class="confirm-box hidden" id="r-confirm">
+        <div id="r-confirm-text"></div>
+        <div class="reply-row">
+          <button class="btn ghost" id="r-cancel">取消</button>
+          <button class="btn" id="r-ok">確定傳送</button>
+        </div>
       </div>
       <div class="hint" id="r-quota"></div>
       <div class="err" id="r-err"></div>
@@ -350,6 +374,7 @@
       d.identities.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
     idSel.value = idCur;
     options($('f-campus'), d.campuses, '全部校區');
+    options($('f-course'), d.courses || [], '全部課程');
     stageSel.innerHTML = `<option value="">全部進度</option><option value="${FOLLOW_UP}">待追蹤</option>` +
       d.stages.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
     stageSel.value = stageCur;
@@ -357,7 +382,7 @@
     $('campus-list').innerHTML = d.campuses.map((c) => `<option value="${esc(c)}">`).join('');
   }
 
-  ['f-identity', 'f-campus', 'f-stage'].forEach((id) => $(id).addEventListener('change', render));
+  ['f-identity', 'f-campus', 'f-course', 'f-stage'].forEach((id) => $(id).addEventListener('change', render));
   $('f-q').addEventListener('input', render);
 
   function identityMatch(l, idf) {
@@ -407,6 +432,7 @@
     return state.data.leads.filter((l) =>
       identityMatch(l, idf) &&
       (!cf || l.campus.indexOf(cf) >= 0) &&
+      courseMatch(l) &&
       (!sf || (sf === FOLLOW_UP ? !!followUpReason(l) : l.stage === sf)) &&
       (!q || (l.nickname + ' ' + (l.children || '') + ' ' + l.name + ' ' + l.lastMessage + ' ' + l.note + ' ' + l.age).toLowerCase().indexOf(q) >= 0));
   }
@@ -414,7 +440,7 @@
   function render() {
     const d = state.data;
     const idf = $('f-identity').value, cf = $('f-campus').value;
-    const base = d.leads.filter((l) => identityMatch(l, idf) && (!cf || l.campus.indexOf(cf) >= 0));
+    const base = d.leads.filter((l) => identityMatch(l, idf) && (!cf || l.campus.indexOf(cf) >= 0) && courseMatch(l));
     const sf = $('f-stage').value;
     const followCount = base.filter((l) => followUpReason(l)).length;
     $('stats').innerHTML =
@@ -444,6 +470,7 @@
           ${reason ? `<span class="tag ${hot ? 'hot' : 'alert'}">${hot ? '' : '⚠ '}${esc(reason)}</span>` : ''}
           ${l.stage ? `<span class="tag stage ${stageClass(l.stage)}">${esc(l.stage)}</span>` : ''}
           ${childTags(l)}
+          ${courseTags(l)}
           <span class="tag">${esc(l.identity)}</span>
           ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
           ${l.age ? `<span class="tag">${esc(l.age)}</span>` : ''}
@@ -574,6 +601,20 @@
     return md + (l.trialTime ? ' ' + l.trialTime : '');
   }
 
+  function courseList(l) {
+    return String(l.courses || '').split(/[、,，\s]+/).filter(String);
+  }
+
+  function courseMatch(l) {
+    const c = $('f-course').value;
+    return !c || courseList(l).indexOf(c) >= 0;
+  }
+
+  /** 課程類別標籤。 */
+  function courseTags(l) {
+    return courseList(l).map((c) => `<span class="tag course">📚 ${esc(c)}</span>`).join('');
+  }
+
   /** 孩子姓名標籤（多位就多個標籤）。 */
   function childTags(l) {
     return String(l.children || '').split(/[、,，\s]+/).filter(String)
@@ -621,7 +662,10 @@
     renderFormBox(l);
     $('r-text').value = '';
     $('r-err').textContent = '';
-    $('r-sender').value = getSender();
+    $('r-sender').value = DEFAULT_SENDER;
+    hideConfirm();
+    $('d-courses').innerHTML = state.data.courses.map((c) =>
+      `<label><input type="checkbox" value="${esc(c)}" ${courseList(l).indexOf(c) >= 0 ? 'checked' : ''}> ${esc(c)}</label>`).join('');
     $('drawer').classList.remove('hidden');
     $('drawer-bg').classList.remove('hidden');
     $('d-msgs').innerHTML = '<div class="m">讀取中…</div>';
@@ -658,9 +702,7 @@
 
   // ── 回覆家長 ──
 
-  const SENDER_KEY = 'funrobot_reply_sender';
-  function getSender() { try { return localStorage.getItem(SENDER_KEY) || ''; } catch (e) { return ''; } }
-  function setSender(v) { try { localStorage.setItem(SENDER_KEY, v); } catch (e) {} }
+  const DEFAULT_SENDER = '顏老師';
 
   async function loadQuota() {
     if (state.quota === undefined) {
@@ -672,34 +714,43 @@
       : '從這裡回覆會計入官方帳號每月訊息則數；在 LINE 官方帳號後台聊天回覆不計。';
   }
 
-  $('r-send').addEventListener('click', async () => {
+  // 第一步：按「傳送」先顯示確認框
+  $('r-send').addEventListener('click', () => {
     const l = state.current;
     if (!l) return;
     const text = $('r-text').value.trim();
-    const sender = $('r-sender').value.trim();
     $('r-err').textContent = '';
-    if (!text) { $('r-err').textContent = '請輸入要傳送的內容'; return; }
-    if (!sender) { $('r-err').textContent = '請填寫回覆者姓名'; $('r-sender').focus(); return; }
-    if (!confirm(`確定要以官方帳號傳送給「${l.nickname || l.name}」？\n\n${text}`)) return;
-    setSender(sender);
+    if (!text) { $('r-err').textContent = '請輸入要傳送的內容'; $('r-text').focus(); return; }
+    $('r-confirm-text').textContent = `確定以官方帳號、${$('r-sender').value} 的名義，傳送給「${l.nickname || l.name}」？`;
+    $('r-confirm').classList.remove('hidden');
     $('r-send').disabled = true;
+  });
+
+  function hideConfirm() {
+    $('r-confirm').classList.add('hidden');
+    $('r-send').disabled = false;
+  }
+  $('r-cancel').addEventListener('click', hideConfirm);
+
+  // 第二步：按「確定傳送」才真的送出
+  $('r-ok').addEventListener('click', async () => {
+    const l = state.current;
+    if (!l) return;
+    const text = $('r-text').value.trim();
+    $('r-ok').disabled = true;
+    $('r-ok').textContent = '傳送中…';
     try {
-      await call('sendReply', getToken(), l.userId, text, sender);
+      await call('sendReply', getToken(), l.userId, text, $('r-sender').value);
       $('r-text').value = '';
       state.quota = undefined;
-      loadQuota();
-      await loadMessages(l.userId);
-      await load(); // 更新待回覆數字與進度（詢問中會自動改成已回覆）
-      const updated = state.data.leads.find((x) => x.userId === l.userId);
-      if (updated && state.current) {
-        state.current = updated;
-        state.stage = updated.stage;
-        renderStagePick();
-      }
+      await load(); // 更新待回覆、進度、試聽時間（回覆提到體驗課時間會自動改成已約試聽）
+      await openDrawer(l.userId);
     } catch (err) {
       $('r-err').textContent = err.message;
     } finally {
-      $('r-send').disabled = false;
+      $('r-ok').disabled = false;
+      $('r-ok').textContent = '確定傳送';
+      hideConfirm();
     }
   });
 
@@ -723,6 +774,7 @@
         stage: state.stage,
         nickname: $('d-nickname').value,
         children: $('d-children').value,
+        courses: [...document.querySelectorAll('#d-courses input:checked')].map((x) => x.value).join('、'),
         identity: $('d-identity').value,
         campus: $('d-campus').value,
         age: $('d-age').value,
