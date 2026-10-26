@@ -388,6 +388,7 @@
 
   async function load() {
     $('refresh').disabled = true;
+    state.loading = true;
     try {
       state.data = await call('getLeads', getToken());
       $('login').classList.add('hidden');
@@ -401,8 +402,39 @@
       else if (err.message !== '登入已過期') $('login-err').textContent = '讀取失敗：' + err.message;
     } finally {
       $('refresh').disabled = false;
+      state.loading = false;
     }
   }
+
+  // ── 每 30 秒自動更新 ──
+  // 正在打字、修改學員資料、確認傳送時暫停，避免把輸入到一半的內容蓋掉；分頁在背景時也暫停。
+  const AUTO_REFRESH_MS = 30 * 1000;
+  /** 使用者正在輸入或編輯 */
+  function userBusy() {
+    const a = document.activeElement;
+    return (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) ||
+      $('r-text').value.trim() !== '' || !$('r-confirm').classList.contains('hidden') || $('d-info-sec').open;
+  }
+  async function autoRefresh() {
+    if (document.hidden || state.loading || $('app').classList.contains('hidden') || userBusy()) return;
+    state.loading = true;
+    try {
+      const data = await call('getLeads', getToken());
+      if (userBusy()) return; // 讀取的這幾秒內開始打字：這次先不更新畫面
+      state.data = data;
+      $('loaded-at').textContent = '更新於 ' + data.loadedAt;
+      fillSelects();
+      renderAll();
+      if (state.currentId) { renderDetail(); loadThread(state.currentId, true); }
+    } catch (err) {
+      console.warn('自動更新失敗', err); // 網路不穩時不打擾，下次再試
+    } finally {
+      state.loading = false;
+    }
+  }
+  setInterval(autoRefresh, AUTO_REFRESH_MS);
+  // 切回這個分頁時馬上更新一次
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
 
   // ── 規則（與介面1相同）──
   const lead = (id) => state.data.leads.find((x) => x.userId === id);
@@ -764,8 +796,9 @@
   }, 'd-ok', 'd-err'));
 
   // ── 對話 ──
-  async function loadThread(userId) {
-    $('d-thread').innerHTML = '<div class="muted">讀取中…</div>';
+  /** silent：自動更新時不顯示「讀取中」，避免畫面閃一下 */
+  async function loadThread(userId, silent) {
+    if (!silent) $('d-thread').innerHTML = '<div class="muted">讀取中…</div>';
     try {
       const msgs = await call('getMessages', getToken(), userId);
       if (state.currentId !== userId) return;
