@@ -131,6 +131,8 @@
   header .tab b.zero { background: #ccc; }
   .tag.pending { background: #fbe3e0; color: var(--warn); font-weight: 600; }
   .tag.child { background: #fef3c7; color: #92400e; font-weight: 600; }
+  .form .hint { font-size: 12px; color: #92400e; }
+  .form .hint:empty { display: none; }
   .tag.done { background: #dcfce7; color: #15803d; }
   .inbox-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
 
@@ -216,6 +218,8 @@
       <label>校區<input id="d-campus" list="campus-list"></label>
       <label>年齡<input id="d-age"></label>
       <label>試聽日期<input id="d-trial" type="date"></label>
+      <label>試聽時間<input id="d-trial-time" type="time"></label>
+      <div class="full hint" id="d-trial-src"></div>
       <label class="full">備註<textarea id="d-note"></textarea></label>
     </div>
     <datalist id="campus-list"></datalist>
@@ -388,6 +392,10 @@
     if (l.stage === '已回覆' && age > 3 * DAY) return `已回覆 ${days} 天未約試聽`;
     if (l.stage === '已試聽') return days >= 1 ? `試聽後 ${days} 天未報名` : '已試聽，待確認報名';
     if (l.stage === '已約試聽' && l.trialDate && l.trialDate < todayStr()) return '試聽日已過，請更新進度';
+    // 家長自己提出體驗課時間，還沒確認
+    if (l.trialSource === '家長提出' && ['', '詢問中', '已回覆'].indexOf(l.stage) >= 0) {
+      return `家長希望 ${trialText(l)} 體驗，請確認`;
+    }
     // 分不出身分的家長沒有進度，有訊息還沒回就提醒確認身分
     if (l.identity === '未分類' && l.pendingCount) return `未分類，${l.pendingCount} 則訊息待處理，請確認身分`;
     return '';
@@ -439,7 +447,7 @@
           <span class="tag">${esc(l.identity)}</span>
           ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
           ${l.age ? `<span class="tag">${esc(l.age)}</span>` : ''}
-          ${l.trialDate ? `<span class="tag">試聽 ${esc(l.trialDate)}</span>` : ''}
+          ${l.trialDate ? `<span class="tag ${l.trialSource === '家長提出' ? 'alert' : ''}">試聽 ${esc(trialText(l))}${l.trialSource === '家長提出' ? '（待確認）' : ''}</span>` : ''}
           ${l.friend === '已封鎖' ? '<span class="tag blocked">已封鎖</span>' : ''}
           ${l.pendingCount ? `<span class="tag pending">💬 ${l.pendingCount} 則待回覆</span>` : ''}
         </div>
@@ -558,6 +566,14 @@
     return i >= 0 ? 'st-' + i : '';
   }
 
+  /** 試聽日期＋時間，例：11/2（六）10:00 */
+  function trialText(l) {
+    if (!l.trialDate) return '';
+    const d = new Date(l.trialDate + 'T00:00:00');
+    const md = isNaN(d) ? l.trialDate : `${d.getMonth() + 1}/${d.getDate()}（${'日一二三四五六'[d.getDay()]}）`;
+    return md + (l.trialTime ? ' ' + l.trialTime : '');
+  }
+
   /** 孩子姓名標籤（多位就多個標籤）。 */
   function childTags(l) {
     return String(l.children || '').split(/[、,，\s]+/).filter(String)
@@ -593,6 +609,11 @@
     $('d-campus').value = l.campus;
     $('d-age').value = l.age;
     $('d-trial').value = l.trialDate;
+    $('d-trial-time').value = l.trialTime || '';
+    $('d-trial-src').textContent = l.trialDate && l.trialSource
+      ? (l.trialSource === '家長提出' ? '⚠ 這個時間是家長在訊息裡提出的，還沒確認。確認後從網頁回覆家長，或直接改時間儲存。'
+        : l.trialSource === '網頁回覆' ? '✓ 時間取自網頁回覆家長的內容。' : '')
+      : '';
     $('d-note').value = l.note;
     $('d-saved').textContent = '';
     $('d-err').textContent = '';
@@ -706,6 +727,7 @@
         campus: $('d-campus').value,
         age: $('d-age').value,
         trialDate: $('d-trial').value,
+        trialTime: $('d-trial-time').value,
         note: $('d-note').value,
       });
       const i = state.data.leads.findIndex((x) => x.userId === l.userId);
