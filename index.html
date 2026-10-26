@@ -130,6 +130,7 @@
   header .tab b { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: #fff; font-size: 12px; margin-left: 4px; }
   header .tab b.zero { background: #ccc; }
   .tag.pending { background: #fbe3e0; color: var(--warn); font-weight: 600; }
+  .tag.child { background: #fef3c7; color: #92400e; font-weight: 600; }
   .tag.done { background: #dcfce7; color: #15803d; }
   .inbox-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
 
@@ -210,6 +211,7 @@
         <div class="stage-pick" id="d-stage"></div>
       </label>
       <label>稱呼（例：守樂爸爸）<input id="d-nickname" placeholder="系統內顯示的名稱"></label>
+      <label>孩子姓名（多位用「、」分隔）<input id="d-children" placeholder="系統會從訊息自動判斷"></label>
       <label>身分<select id="d-identity"></select></label>
       <label>校區<input id="d-campus" list="campus-list"></label>
       <label>年齡<input id="d-age"></label>
@@ -398,7 +400,7 @@
       identityMatch(l, idf) &&
       (!cf || l.campus.indexOf(cf) >= 0) &&
       (!sf || (sf === FOLLOW_UP ? !!followUpReason(l) : l.stage === sf)) &&
-      (!q || (l.nickname + ' ' + l.name + ' ' + l.lastMessage + ' ' + l.note + ' ' + l.age).toLowerCase().indexOf(q) >= 0));
+      (!q || (l.nickname + ' ' + (l.children || '') + ' ' + l.name + ' ' + l.lastMessage + ' ' + l.note + ' ' + l.age).toLowerCase().indexOf(q) >= 0));
   }
 
   function render() {
@@ -433,6 +435,7 @@
         <div class="tags">
           ${reason ? `<span class="tag ${hot ? 'hot' : 'alert'}">${hot ? '' : '⚠ '}${esc(reason)}</span>` : ''}
           ${l.stage ? `<span class="tag stage ${stageClass(l.stage)}">${esc(l.stage)}</span>` : ''}
+          ${childTags(l)}
           <span class="tag">${esc(l.identity)}</span>
           ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
           ${l.age ? `<span class="tag">${esc(l.age)}</span>` : ''}
@@ -468,6 +471,7 @@
         <div class="tags">
           ${l.pendingCount ? `<span class="tag pending">💬 ${l.pendingCount} 則待回覆</span>`
             : `<span class="tag done">已處理${l.lastReplyAt ? '・最後回覆 ' + esc(l.lastReplyAt) : ''}</span>`}
+          ${childTags(l)}
           ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
           ${l.friend === '已封鎖' ? '<span class="tag blocked">已封鎖</span>' : ''}
         </div>
@@ -554,6 +558,12 @@
     return i >= 0 ? 'st-' + i : '';
   }
 
+  /** 孩子姓名標籤（多位就多個標籤）。 */
+  function childTags(l) {
+    return String(l.children || '').split(/[、,，\s]+/).filter(String)
+      .map((c) => `<span class="tag child">👦 ${esc(c)}</span>`).join('');
+  }
+
   /** 有「稱呼」就以稱呼為主，LINE 名稱小字附在後面。 */
   function nameHtml(l) {
     if (l.nickname) return `${esc(l.nickname)}<span class="line-name">${esc(l.name)}</span>`;
@@ -578,6 +588,7 @@
     state.stage = l.stage;
     $('d-name').innerHTML = nameHtml(l);
     $('d-nickname').value = l.nickname;
+    $('d-children').value = l.children || '';
     $('d-identity').value = l.identity;
     $('d-campus').value = l.campus;
     $('d-age').value = l.age;
@@ -690,6 +701,7 @@
       const updated = await call('updateLead', getToken(), l.userId, {
         stage: state.stage,
         nickname: $('d-nickname').value,
+        children: $('d-children').value,
         identity: $('d-identity').value,
         campus: $('d-campus').value,
         age: $('d-age').value,
