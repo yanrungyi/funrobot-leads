@@ -69,7 +69,6 @@
   .group.g-form > .gh { background: var(--brand-soft); color: var(--brand-dark); }
   .group.g-soon > .gh { background: #f5f3ff; color: #6d28d9; }
   .group.g-follow > .gh { background: #fffbeb; color: #92400e; }
-  .group.g-inbox > .gh { background: var(--blue-soft); color: var(--blue); }
   .all-clear { text-align: center; padding: 48px 16px; color: var(--muted); }
 
   /* 清單列 */
@@ -208,9 +207,7 @@
     <span class="logo">FUN學 招生追蹤</span>
     <button class="tab on" data-view="todo">今日待辦<span class="badge" id="n-todo">0</span></button>
     <button class="tab" data-view="ask">問課學生<span class="badge zero" id="n-ask">0</span></button>
-    <button class="tab" data-view="trial">體驗課<span class="badge zero" id="n-trial">0</span></button>
-    <button class="tab" data-view="inbox">在學訊息<span class="badge" id="n-inbox">0</span></button>
-    <div class="right">
+    <button class="tab" data-view="trial">體驗課<span class="badge zero" id="n-trial">0</span></button>    <div class="right">
       <span class="muted" id="loaded-at"></span>
       <button class="btn ghost small" id="refresh">重新整理</button>
       <button class="btn ghost small" id="logout">登出</button>
@@ -237,12 +234,6 @@
         </div>
         <div class="count" id="count"></div>
         <div class="list-card" id="lead-list"></div>
-      </div>
-      <!-- 在學訊息 -->
-      <div id="view-inbox" class="hidden">
-        <div class="todo-head"><h2>在學家長訊息</h2><div class="muted" style="font-size:13px">還沒從這裡回覆的訊息。貼圖、自動回應關鍵字不算。</div></div>
-        <label class="count" style="display:block"><input type="checkbox" id="inbox-all"> 也顯示已處理的在學家長</label>
-        <div class="list-card" id="inbox-list"></div>
       </div>
     </section>
 
@@ -307,6 +298,7 @@
         <!-- 對話：主要區塊，配色接近 LINE -->
         <div class="section chat">
           <h3>💬 對話</h3>
+          <div class="hint muted" style="margin:-4px 0 8px">在 LINE 官方帳號後台聊天室送出的訊息，LINE 不會傳給系統，所以不會顯示在這裡；從下方回覆的訊息才會出現。</div>
           <!-- 跟 LINE 一樣：舊訊息在上、最新在最下面，輸入框在對話下方 -->
           <div class="thread" id="d-thread"></div>
           <div class="composer">
@@ -525,12 +517,14 @@
     renderUrgent();
     renderTodo();
     renderLeads();
-    renderInbox();
   }
+
+  // 系統定位為「新生招生追蹤」：在學家長在 LINE 官方帳號後台處理，不列入待辦與警示（資料仍會記錄）
+  const isNew = (l) => l.identity !== '在學';
 
   // ── 紅色警示橫幅 ──
   function renderUrgent() {
-    const items = state.data.leads.filter((l) => urgentReason(l)).sort((a, b) => b.lastTs - a.lastTs);
+    const items = state.data.leads.filter((l) => isNew(l) && urgentReason(l)).sort((a, b) => b.lastTs - a.lastTs);
     $('urgent').classList.toggle('hidden', !items.length);
     $('urgent').innerHTML = items.length
       ? `<b>🚨 ${items.length} 位家長的體驗課超過 ${URGENT_HOURS} 小時沒有處理</b><div class="items">${items.map((l) =>
@@ -540,7 +534,7 @@
 
   // ── 今日待辦 ──
   function renderTodo() {
-    const leads = state.data.leads;
+    const leads = state.data.leads.filter(isNew);
     const used = new Set();
     const take = (list) => list.filter((l) => !used.has(l.userId) && used.add(l.userId));
     const byNewest = (a, b) => b.lastTs - a.lastTs;
@@ -555,10 +549,7 @@
           .sort((a, b) => (a.trialDate + a.trialTime).localeCompare(b.trialDate + b.trialTime))),
         why: (l) => `${l.trialDate === today ? '今天' : '明天'} ${trialText(l)} 體驗` },
       { cls: 'g-follow', title: '⚠ 待追蹤新生', color: 'amber',
-        items: take(leads.filter((l) => l.identity !== '在學' && followReason(l)).sort(byNewest)), why: followReason },
-      { cls: 'g-inbox', title: '💬 在學家長待回覆', color: 'blue',
-        items: take(leads.filter((l) => l.identity === '在學' && l.pendingCount).sort((a, b) => b.pendingTs - a.pendingTs)),
-        why: (l) => `${l.pendingCount} 則訊息待回覆：${l.pendingPreview}` },
+        items: take(leads.filter((l) => followReason(l)).sort(byNewest)), why: followReason },
     ];
     const total = groups.reduce((n, g) => n + g.items.length, 0);
     $('n-todo').textContent = total;
@@ -648,22 +639,6 @@
     renderLeads();
   });
 
-  // ── 在學訊息 ──
-  function renderInbox() {
-    const enrolled = state.data.leads.filter((l) => l.identity === '在學');
-    const pending = enrolled.filter((l) => l.pendingCount).sort((a, b) => b.pendingTs - a.pendingTs);
-    const handled = enrolled.filter((l) => !l.pendingCount).sort((a, b) => b.lastTs - a.lastTs);
-    $('n-inbox').textContent = pending.length;
-    $('n-inbox').classList.toggle('zero', !pending.length);
-    const rows = $('inbox-all').checked ? pending.concat(handled) : pending;
-    $('inbox-list').innerHTML = rows.length
-      ? rows.map((l) => l.pendingCount
-          ? rowHtml(l, [`💬 ${l.pendingCount} 則待回覆`, 'blue'], l.pendingAt, l.pendingPreview)
-          : rowHtml(l, ['✓ 已處理' + (l.lastReplyAt ? '・最後回覆 ' + l.lastReplyAt : ''), ''], l.lastAt, l.lastMessage)).join('')
-      : '<div class="all-clear">在學家長的訊息都已處理 👍</div>';
-  }
-  $('inbox-all').addEventListener('change', renderInbox);
-
   // ── 切換分頁、點清單 ──
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
     const view = t.dataset.view;
@@ -671,7 +646,7 @@
     // 問課學生、體驗課共用 view-leads
     const pane = view === 'ask' || view === 'trial' ? 'leads' : view;
     if (pane === 'leads' && state.zone !== view) { state.zone = view; state.stageFilter = ''; }
-    ['todo', 'leads', 'inbox'].forEach((v) => $('view-' + v).classList.toggle('hidden', v !== pane));
+    ['todo', 'leads'].forEach((v) => $('view-' + v).classList.toggle('hidden', v !== pane));
     if (pane === 'leads') renderLeads();
   }));
   [$('pane-list'), $('urgent')].forEach((el) => el.addEventListener('click', (e) => {
