@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>FUN學 招生追蹤</title>
+<style>
+  :root {
+    --brand: #f07b1d; --brand-soft: #fde7d3; --ink: #2b2b2b; --muted: #777;
+    --line: #e6e1dc; --bg: #faf7f4; --card: #fff; --ok: #2e8b57; --warn: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; color: var(--ink); background: var(--bg); font-size: 15px; }
+  button, input, select, textarea { font: inherit; }
+  .hidden { display: none !important; }
+
+  /* 登入 */
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .login-box { background: var(--card); border-radius: 14px; padding: 28px 24px; width: 100%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,.06); text-align: center; }
+  .login-box h1 { margin: 0 0 4px; font-size: 22px; color: var(--brand); }
+  .login-box p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+  .login-box input { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; text-align: center; letter-spacing: 2px; }
+  .btn { background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn.ghost { background: transparent; color: var(--brand); border: 1px solid var(--brand); }
+  .login-box .btn { width: 100%; padding: 12px; }
+  .err { color: var(--warn); font-size: 13px; min-height: 18px; margin-top: 10px; }
+
+  /* 主畫面 */
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 5; }
+  header h1 { margin: 0; font-size: 18px; color: var(--brand); cursor: pointer; }
+  header h1 small { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  header .enrolled { margin-right: auto; border: 1px solid var(--line); background: #f1eeea; color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  header .enrolled b { color: #1d4ed8; }
+  header .enrolled.on { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  header .enrolled.on b { color: #fff; }
+
+  /* 打開網頁時的待追蹤提醒 */
+  #alert-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 20; }
+  #alert { position: fixed; z-index: 21; left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 32px); max-width: 440px; background: var(--card); border-radius: 14px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+  #alert h2 { margin: 0 0 4px; font-size: 18px; color: var(--warn); }
+  #alert p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  #alert-list { max-height: 50vh; overflow-y: auto; display: grid; gap: 6px; margin-bottom: 14px; }
+  #alert-list .item { border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  #alert-list .item:hover { border-color: var(--warn); }
+  #alert-list .item .why { color: var(--warn); font-size: 12px; font-weight: 600; }
+  #alert .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .stat b { color: var(--c); margin-left: 4px; }
+  .stat .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; }
+  .stat.active { background: var(--c); color: #fff; border-color: var(--c); }
+  .stat.active b { color: #fff; }
+  .stat.active .dot { background: #fff; }
+  .filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .filters select, .filters input { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); width: 100%; min-width: 0; }
+  .count { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .list { display: grid; gap: 8px; }
+  .lead { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .lead:hover { border-color: var(--brand); }
+  .lead .name { font-weight: 600; }
+  .lead .time { color: var(--muted); font-size: 12px; text-align: right; }
+  .lead .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lead .msg { grid-column: 1 / -1; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f1eeea; }
+  /* 進度顏色：詢問中、已回覆、已約試聽、已試聽、已報名、暫不報名 */
+  .st-0 { --c: #c2410c; --cb: #ffedd5; }
+  .st-1 { --c: #1d4ed8; --cb: #dbeafe; }
+  .st-2 { --c: #7e22ce; --cb: #f3e8ff; }
+  .st-3 { --c: #0f766e; --cb: #ccfbf1; }
+  .st-4 { --c: #15803d; --cb: #dcfce7; }
+  .st-5 { --c: #6b7280; --cb: #f3f4f6; }
+  .tag.stage { background: var(--cb); color: var(--c); font-weight: 600; }
+  /* 待追蹤 */
+  .stat.follow { --c: #c0392b; }
+  .lead.overdue { border-left: 4px solid var(--warn); }
+  /* 已填體驗課表單：最優先 */
+  .lead.hot { border-left: 6px solid #e8590c; background: #fff4ec; }
+  .tag.hot { background: #e8590c; color: #fff; font-weight: 700; }
+  #alert-list .item.hot { border-left: 6px solid #e8590c; background: #fff4ec; }
+  .formbox { background: #fff4ec; border: 1px solid #fcd5b5; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+  .formbox h3 { margin: 0 0 6px; color: #c2410c; }
+  .formbox div { font-size: 14px; line-height: 1.7; }
+  .formbox a { color: #1d4ed8; font-weight: 600; }
+  .tag.alert { background: #fbe3e0; color: var(--warn); font-weight: 600; }
+  .lead .line-name { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 6px; }
+  .tag.blocked { background: #fbe3e0; color: var(--warn); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+
+  /* 詳細資料 */
+  #drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 10; }
+  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 460px; background: var(--card); z-index: 11; display: flex; flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,.1); }
+  #drawer .head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  #drawer .head h2 { margin: 0; font-size: 17px; flex: 1; }
+  #drawer .close { background: none; border: 0; font-size: 22px; cursor: pointer; color: var(--muted); }
+  #drawer .body { padding: 16px; overflow-y: auto; flex: 1; }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form label { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+  .form .full { grid-column: 1 / -1; }
+  .form select, .form input, .form textarea { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; width: 100%; color: var(--ink); background: #fff; }
+  .form textarea { min-height: 70px; resize: vertical; }
+  .stage-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stage-pick button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+  .stage-pick button { color: var(--c); border-color: var(--cb); background: #fff; }
+  .stage-pick button.on { background: var(--c); color: #fff; border-color: var(--c); }
+  #drawer .head .line-name { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .save-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .save-row .msg-ok { color: var(--ok); font-size: 13px; }
+  h3 { font-size: 14px; margin: 22px 0 8px; color: var(--muted); }
+  .msgs { display: grid; gap: 6px; }
+  .m { background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  .m .at { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+  .m .c { white-space: pre-wrap; word-break: break-word; }
+  .m.out { background: #e8f0fe; margin-left: 32px; }
+  .m.out .at { color: #1d4ed8; }
+
+  /* 回覆家長 */
+  .reply textarea { width: 100%; min-height: 80px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+  .reply-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .reply-row input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .reply .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  /* 分頁 */
+  header .tab { border: 0; background: none; padding: 6px 4px; cursor: pointer; font-size: 15px; color: var(--muted); border-bottom: 3px solid transparent; }
+  header .tab.on { color: var(--brand); border-bottom-color: var(--brand); font-weight: 700; }
+  header .tab b { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: #fff; font-size: 12px; margin-left: 4px; }
+  header .tab b.zero { background: #ccc; }
+  .tag.pending { background: #fbe3e0; color: var(--warn); font-weight: 600; }
+  .tag.done { background: #dcfce7; color: #15803d; }
+  .inbox-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 700px) {
+    .filters { grid-template-columns: 1fr 1fr; }
+    header .meta, header h1 small { display: none; }
+    header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<section id="login">
+  <div class="login-box">
+    <h1>FUN學 招生追蹤</h1>
+    <p>放學機器人科技教育中心</p>
+    <form id="login-form">
+      <input id="pin" type="password" placeholder="請輸入密碼" autocomplete="current-password" required>
+      <button class="btn" id="login-btn" type="submit">登入</button>
+    </form>
+    <div class="err" id="login-err"></div>
+  </div>
+</section>
+
+<section id="app" class="hidden">
+  <header>
+    <h1>新生訊息追蹤<small>目前狀態</small></h1>
+    <button class="enrolled" id="enrolled-badge" title="切換成只看在學家長">在學 <b id="enrolled-n">0</b> 位</button>
+    <button class="tab" id="tab-inbox" title="在學家長傳來、還沒從網頁回覆的訊息">在學學生訊息<b id="inbox-n" class="zero">0</b></button>
+    <span class="meta" id="loaded-at"></span>
+    <button class="btn ghost" id="refresh">重新整理</button>
+    <button class="btn ghost" id="logout">登出</button>
+  </header>
+  <main id="view-inbox" class="hidden">
+    <div class="inbox-top">
+      <span>在學家長傳來、還沒從這個網頁回覆的訊息，最新在最上面。貼圖、自動回應關鍵字（例：我要請假）不算待回覆。</span>
+      <label><input type="checkbox" id="inbox-all"> 也顯示已處理的在學家長</label>
+    </div>
+    <div class="list" id="inbox-list"></div>
+  </main>
+  <main id="view-leads">
+    <div class="stats" id="stats"></div>
+    <div class="filters">
+      <select id="f-identity"></select>
+      <select id="f-campus"></select>
+      <select id="f-stage"></select>
+      <input id="f-q" type="search" placeholder="搜尋名稱、訊息、備註">
+    </div>
+    <div class="count" id="count"></div>
+    <div class="list" id="list"></div>
+  </main>
+</section>
+
+<div id="alert-bg" class="hidden"></div>
+<div id="alert" class="hidden" role="dialog" aria-labelledby="alert-title">
+  <h2 id="alert-title"></h2>
+  <p>點名字可以直接打開，更新進度後就不會再提醒。</p>
+  <div id="alert-list"></div>
+  <div class="actions">
+    <button class="btn ghost" id="alert-close">稍後再看</button>
+    <button class="btn" id="alert-all">只看待追蹤</button>
+  </div>
+</div>
+
+<div id="drawer-bg" class="hidden"></div>
+<aside id="drawer" class="hidden">
+  <div class="head">
+    <h2 id="d-name"></h2>
+    <button class="close" id="d-close" aria-label="關閉">×</button>
+  </div>
+  <div class="body">
+    <div class="formbox hidden" id="d-form">
+      <h3 id="d-form-title">🔥 體驗課表單資料</h3>
+      <div id="d-form-body"></div>
+    </div>
+    <div class="form">
+      <label class="full">進度
+        <div class="stage-pick" id="d-stage"></div>
+      </label>
+      <label>稱呼（例：守樂爸爸）<input id="d-nickname" placeholder="系統內顯示的名稱"></label>
+      <label>身分<select id="d-identity"></select></label>
+      <label>校區<input id="d-campus" list="campus-list"></label>
+      <label>年齡<input id="d-age"></label>
+      <label>試聽日期<input id="d-trial" type="date"></label>
+      <label class="full">備註<textarea id="d-note"></textarea></label>
+    </div>
+    <datalist id="campus-list"></datalist>
+    <div class="save-row">
+      <button class="btn" id="d-save">儲存</button>
+      <span class="msg-ok" id="d-saved"></span>
+      <span class="err" id="d-err"></span>
+    </div>
+    <h3>回覆家長（以官方帳號傳到家長的 LINE）</h3>
+    <div class="reply">
+      <textarea id="r-text" placeholder="輸入要傳給家長的訊息…"></textarea>
+      <div class="reply-row">
+        <input id="r-sender" placeholder="回覆者（例：王老師）" maxlength="20">
+        <button class="btn" id="r-send">傳送</button>
+      </div>
+      <div class="hint" id="r-quota"></div>
+      <div class="err" id="r-err"></div>
+    </div>
+    <h3>訊息紀錄（最新在最上面）</h3>
+    <div class="msgs" id="d-msgs"></div>
+  </div>
+</aside>
+
+<script>
+  const KEY = 'funrobot_leads_token';
+  const state = { token: null, data: null, current: null, stage: '', statFilter: '' };
+  const $ = (id) => document.getElementById(id);
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function getToken() { try { return sessionStorage.getItem(KEY); } catch (e) { return state.token; } }
+  function setToken(t) { state.token = t; try { t ? sessionStorage.setItem(KEY, t) : sessionStorage.removeItem(KEY); } catch (e) {} }
+
+  // 後台（Apps Script 網頁應用程式）。網頁放在 GitHub Pages，用 fetch 呼叫；
+  // 不帶 Google 登入資訊（credentials: 'omit'），所以瀏覽器登入多個 Google 帳號也能用。
+  const API_URL = 'https://script.google.com/macros/s/AKfycbx3g7gPRtCO4Qy9XQ7TAVCTmbjOZ7YI6EmljX32Walpzi9rBI1RpAw9ve1G45WeJbbmcA/exec';
+
+  /** 呼叫後台；登入過期時自動回到登入畫面。 */
+  async function call(fn, ...args) {
+    let data;
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        // text/plain 不會觸發 CORS 預檢，Apps Script 才收得到
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ api: fn, args }),
+        credentials: 'omit',
+        redirect: 'follow',
+      });
+      data = await res.json();
+    } catch (err) {
+      throw new Error('連線失敗，請檢查網路後再試一次');
+    }
+    if (data.error) {
+      if (data.error.indexOf('SESSION_EXPIRED') >= 0) { showLogin('登入已過期，請重新登入'); throw new Error('登入已過期'); }
+      throw new Error(data.error);
+    }
+    return data.result;
+  }
+
+  function showLogin(msg) {
+    setToken(null);
+    state.alertShown = false;
+    closeAlert();
+    closeDrawer();
+    $('app').classList.add('hidden');
+    $('login').classList.remove('hidden');
+    $('login-err').textContent = msg || '';
+    $('pin').focus();
+  }
+
+  $('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('login-btn').disabled = true;
+    $('login-err').textContent = '';
+    try {
+      const token = await call('login', $('pin').value);
+      setToken(token);
+      $('pin').value = '';
+      await load();
+    } catch (err) {
+      $('login-err').textContent = err.message;
+    } finally {
+      $('login-btn').disabled = false;
+    }
+  });
+
+  $('logout').addEventListener('click', () => showLogin());
+  $('refresh').addEventListener('click', () => load());
+
+  async function load() {
+    $('refresh').disabled = true;
+    try {
+      state.data = await call('getLeads', getToken());
+      $('login').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      $('loaded-at').textContent = '更新於 ' + state.data.loadedAt;
+      fillFilters();
+      render();
+      maybeShowAlert();
+    } catch (err) {
+      if (!$('app').classList.contains('hidden')) alert('讀取失敗：' + err.message);
+      else if (err.message !== '登入已過期') $('login-err').textContent = '讀取失敗：' + err.message;
+    } finally {
+      $('refresh').disabled = false;
+    }
+  }
+
+  function options(sel, list, allLabel) {
+    const cur = sel.value;
+    sel.innerHTML = (allLabel ? `<option value="">${esc(allLabel)}</option>` : '') +
+      list.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if (cur && list.indexOf(cur) >= 0) sel.value = cur;
+  }
+
+  const LEAD_VIEW = '__lead';     // 問課＋未分類
+  const FOLLOW_UP = '__follow';   // 待追蹤
+  const DAY = 24 * 60 * 60 * 1000;
+
+  function fillFilters() {
+    const d = state.data;
+    const idSel = $('f-identity'), stageSel = $('f-stage');
+    const idCur = idSel.options.length ? idSel.value : LEAD_VIEW;
+    const stageCur = stageSel.value;
+    idSel.innerHTML = `<option value="${LEAD_VIEW}">問課＋未分類</option><option value="">全部身分</option>` +
+      d.identities.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    idSel.value = idCur;
+    options($('f-campus'), d.campuses, '全部校區');
+    stageSel.innerHTML = `<option value="">全部進度</option><option value="${FOLLOW_UP}">待追蹤</option>` +
+      d.stages.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    stageSel.value = stageCur;
+    options($('d-identity'), d.identities);
+    $('campus-list').innerHTML = d.campuses.map((c) => `<option value="${esc(c)}">`).join('');
+  }
+
+  ['f-identity', 'f-campus', 'f-stage'].forEach((id) => $(id).addEventListener('change', render));
+  $('f-q').addEventListener('input', render);
+
+  function identityMatch(l, idf) {
+    if (idf === LEAD_VIEW) return l.identity === '問課' || l.identity === '未分類';
+    return !idf || l.identity === idf;
+  }
+
+  function todayStr() {
+    const t = new Date();
+    return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+  }
+
+  /** 已填體驗課表單、還沒約好試聽：最優先。 */
+  function isHotForm(l) {
+    return !!l.formTs && ['', '詢問中', '已回覆'].indexOf(l.stage) >= 0;
+  }
+
+  /** 排序用：表單 2、其他待追蹤 1、其餘 0。 */
+  function priority(l) {
+    return isHotForm(l) ? 2 : followUpReason(l) ? 1 : 0;
+  }
+
+  /** 需要追蹤的原因；不需要追蹤時回傳空字串。 */
+  function followUpReason(l) {
+    if (isHotForm(l)) {
+      const hours = Math.floor((Date.now() - l.formTs) / 3600000);
+      return hours >= 2 ? `🔥 已填體驗課表單，${hours} 小時未安排` : '🔥 已填體驗課表單，請盡快聯絡';
+    }
+    const age = l.stageTs ? Date.now() - l.stageTs : 0;
+    const days = Math.floor(age / DAY);
+    if (l.stage === '詢問中' && age > DAY) return `詢問中 ${days} 天未更新`;
+    if (l.stage === '已回覆' && age > 3 * DAY) return `已回覆 ${days} 天未約試聽`;
+    if (l.stage === '已試聽') return days >= 1 ? `試聽後 ${days} 天未報名` : '已試聽，待確認報名';
+    if (l.stage === '已約試聽' && l.trialDate && l.trialDate < todayStr()) return '試聽日已過，請更新進度';
+    // 分不出身分的家長沒有進度，有訊息還沒回就提醒確認身分
+    if (l.identity === '未分類' && l.pendingCount) return `未分類，${l.pendingCount} 則訊息待處理，請確認身分`;
+    return '';
+  }
+
+  function filtered() {
+    const idf = $('f-identity').value, cf = $('f-campus').value, sf = $('f-stage').value;
+    const q = $('f-q').value.trim().toLowerCase();
+    return state.data.leads.filter((l) =>
+      identityMatch(l, idf) &&
+      (!cf || l.campus.indexOf(cf) >= 0) &&
+      (!sf || (sf === FOLLOW_UP ? !!followUpReason(l) : l.stage === sf)) &&
+      (!q || (l.nickname + ' ' + l.name + ' ' + l.lastMessage + ' ' + l.note + ' ' + l.age).toLowerCase().indexOf(q) >= 0));
+  }
+
+  function render() {
+    const d = state.data;
+    const idf = $('f-identity').value, cf = $('f-campus').value;
+    const base = d.leads.filter((l) => identityMatch(l, idf) && (!cf || l.campus.indexOf(cf) >= 0));
+    const sf = $('f-stage').value;
+    const followCount = base.filter((l) => followUpReason(l)).length;
+    $('stats').innerHTML =
+      `<span class="stat follow ${sf === FOLLOW_UP ? 'active' : ''}" data-stage="${FOLLOW_UP}"><span class="dot"></span>待追蹤<b>${followCount}</b></span>` +
+      d.stages.map((s, i) => {
+        const n = base.filter((l) => l.stage === s).length;
+        return `<span class="stat st-${i} ${sf === s ? 'active' : ''}" data-stage="${esc(s)}"><span class="dot"></span>${esc(s)}<b>${n}</b></span>`;
+      }).join('');
+
+    // 待追蹤排最前面，其餘維持最後訊息時間新到舊
+    $('enrolled-n').textContent = d.leads.filter((l) => l.identity === '在學').length;
+    $('enrolled-badge').classList.toggle('on', idf === '在學');
+
+    // 已填體驗課表單最前面，再來是其他待追蹤，其餘維持最後訊息時間新到舊
+    const rows = filtered().map((l) => ({ l, reason: followUpReason(l), hot: isHotForm(l) }));
+    rows.sort((a, b) => priority(b.l) - priority(a.l));
+    const nFollow = rows.filter((r) => r.reason).length;
+    const nHot = rows.filter((r) => r.hot).length;
+    $('count').textContent = `共 ${rows.length} 位` +
+      (nFollow ? `，其中 ${nFollow} 位待追蹤` + (nHot ? `（🔥 ${nHot} 位已填體驗課表單）` : '') + '，排在最前面' : '') +
+      '；依最後訊息時間，最新在最上面';
+    $('list').innerHTML = rows.length ? rows.map(({ l, reason, hot }) => `
+      <div class="lead ${hot ? 'hot' : reason ? 'overdue' : ''}" data-id="${esc(l.userId)}">
+        <div class="name">${nameHtml(l)}</div>
+        <div class="time">${esc(l.lastAt)}</div>
+        <div class="tags">
+          ${reason ? `<span class="tag ${hot ? 'hot' : 'alert'}">${hot ? '' : '⚠ '}${esc(reason)}</span>` : ''}
+          ${l.stage ? `<span class="tag stage ${stageClass(l.stage)}">${esc(l.stage)}</span>` : ''}
+          <span class="tag">${esc(l.identity)}</span>
+          ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
+          ${l.age ? `<span class="tag">${esc(l.age)}</span>` : ''}
+          ${l.trialDate ? `<span class="tag">試聽 ${esc(l.trialDate)}</span>` : ''}
+          ${l.friend === '已封鎖' ? '<span class="tag blocked">已封鎖</span>' : ''}
+          ${l.pendingCount ? `<span class="tag pending">💬 ${l.pendingCount} 則待回覆</span>` : ''}
+        </div>
+        <div></div>
+        <div class="msg">${esc(l.lastMessage)}</div>
+      </div>`).join('') : '<div class="empty">目前沒有符合條件的家長</div>';
+
+    renderInbox();
+  }
+
+  // ── 在學學生訊息 ──
+
+  function inboxRows() {
+    const enrolled = state.data.leads.filter((l) => l.identity === '在學');
+    const pending = enrolled.filter((l) => l.pendingCount).sort((a, b) => b.pendingTs - a.pendingTs);
+    const handled = enrolled.filter((l) => !l.pendingCount).sort((a, b) => b.lastTs - a.lastTs);
+    return { pending, handled };
+  }
+
+  function renderInbox() {
+    const { pending, handled } = inboxRows();
+    $('inbox-n').textContent = pending.length;
+    $('inbox-n').classList.toggle('zero', !pending.length);
+    const rows = $('inbox-all').checked ? pending.concat(handled) : pending;
+    $('inbox-list').innerHTML = rows.length ? rows.map((l) => `
+      <div class="lead ${l.pendingCount ? 'overdue' : ''}" data-id="${esc(l.userId)}">
+        <div class="name">${nameHtml(l)}</div>
+        <div class="time">${esc(l.pendingCount ? l.pendingAt : l.lastAt)}</div>
+        <div class="tags">
+          ${l.pendingCount ? `<span class="tag pending">💬 ${l.pendingCount} 則待回覆</span>`
+            : `<span class="tag done">已處理${l.lastReplyAt ? '・最後回覆 ' + esc(l.lastReplyAt) : ''}</span>`}
+          ${l.campus ? `<span class="tag">${esc(l.campus)}</span>` : ''}
+          ${l.friend === '已封鎖' ? '<span class="tag blocked">已封鎖</span>' : ''}
+        </div>
+        <div></div>
+        <div class="msg">${esc(l.pendingCount ? l.pendingPreview : l.lastMessage)}</div>
+      </div>`).join('') : '<div class="empty">在學家長的訊息都已處理 👍</div>';
+  }
+
+  $('inbox-all').addEventListener('change', renderInbox);
+  $('inbox-list').addEventListener('click', (e) => {
+    const el = e.target.closest('.lead');
+    if (el) openDrawer(el.dataset.id);
+  });
+
+  function showView(view) {
+    state.view = view;
+    $('view-leads').classList.toggle('hidden', view !== 'leads');
+    $('view-inbox').classList.toggle('hidden', view !== 'inbox');
+    $('tab-inbox').classList.toggle('on', view === 'inbox');
+  }
+  $('tab-inbox').addEventListener('click', () => showView('inbox'));
+  document.querySelector('header h1').addEventListener('click', () => showView('leads'));
+
+  $('enrolled-badge').addEventListener('click', () => {
+    showView('leads');
+    $('f-identity').value = $('f-identity').value === '在學' ? LEAD_VIEW : '在學';
+    $('f-stage').value = '';
+    render();
+  });
+
+  /** 每次打開（登入）網頁時，跳出一次新生待追蹤提醒；按「重新整理」不會再跳。 */
+  function maybeShowAlert() {
+    if (state.alertShown) return;
+    state.alertShown = true;
+    const items = state.data.leads
+      .filter((l) => identityMatch(l, LEAD_VIEW))
+      .map((l) => ({ l, reason: followUpReason(l), hot: isHotForm(l) }))
+      .filter((x) => x.reason)
+      .sort((a, b) => priority(b.l) - priority(a.l));
+    if (!items.length) return;
+    const nHot = items.filter((x) => x.hot).length;
+    $('alert-title').textContent = nHot
+      ? `🔥 ${nHot} 位已填體驗課表單，共 ${items.length} 位新生待追蹤`
+      : `⚠ 有 ${items.length} 位新生待追蹤`;
+    $('alert-list').innerHTML = items.map(({ l, reason, hot }) =>
+      `<div class="item ${hot ? 'hot' : ''}" data-id="${esc(l.userId)}"><div>${nameHtml(l)}</div><div class="why">${esc(reason)}</div></div>`).join('');
+    $('alert').classList.remove('hidden');
+    $('alert-bg').classList.remove('hidden');
+  }
+
+  function closeAlert() {
+    $('alert').classList.add('hidden');
+    $('alert-bg').classList.add('hidden');
+  }
+  $('alert-close').addEventListener('click', closeAlert);
+  $('alert-bg').addEventListener('click', closeAlert);
+  $('alert-all').addEventListener('click', () => {
+    closeAlert();
+    $('f-identity').value = LEAD_VIEW;
+    $('f-stage').value = FOLLOW_UP;
+    render();
+  });
+  $('alert-list').addEventListener('click', (e) => {
+    const el = e.target.closest('.item');
+    if (!el) return;
+    closeAlert();
+    openDrawer(el.dataset.id);
+  });
+
+  $('stats').addEventListener('click', (e) => {
+    const s = e.target.closest('.stat');
+    if (!s) return;
+    $('f-stage').value = $('f-stage').value === s.dataset.stage ? '' : s.dataset.stage;
+    render();
+  });
+
+  $('list').addEventListener('click', (e) => {
+    const el = e.target.closest('.lead');
+    if (el) openDrawer(el.dataset.id);
+  });
+
+  function stageClass(stage) {
+    const i = state.data.stages.indexOf(stage);
+    return i >= 0 ? 'st-' + i : '';
+  }
+
+  /** 有「稱呼」就以稱呼為主，LINE 名稱小字附在後面。 */
+  function nameHtml(l) {
+    if (l.nickname) return `${esc(l.nickname)}<span class="line-name">${esc(l.name)}</span>`;
+    return esc(l.name || '（未取得名稱）');
+  }
+
+  function renderStagePick() {
+    $('d-stage').innerHTML = state.data.stages.map((s, i) =>
+      `<button type="button" class="st-${i} ${state.stage === s ? 'on' : ''}" data-s="${esc(s)}">${esc(s)}</button>`).join('');
+  }
+  $('d-stage').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    state.stage = state.stage === b.dataset.s ? '' : b.dataset.s;
+    renderStagePick();
+  });
+
+  async function openDrawer(userId) {
+    const l = state.data.leads.find((x) => x.userId === userId);
+    if (!l) return;
+    state.current = l;
+    state.stage = l.stage;
+    $('d-name').innerHTML = nameHtml(l);
+    $('d-nickname').value = l.nickname;
+    $('d-identity').value = l.identity;
+    $('d-campus').value = l.campus;
+    $('d-age').value = l.age;
+    $('d-trial').value = l.trialDate;
+    $('d-note').value = l.note;
+    $('d-saved').textContent = '';
+    $('d-err').textContent = '';
+    renderStagePick();
+    renderFormBox(l);
+    $('r-text').value = '';
+    $('r-err').textContent = '';
+    $('r-sender').value = getSender();
+    $('drawer').classList.remove('hidden');
+    $('drawer-bg').classList.remove('hidden');
+    $('d-msgs').innerHTML = '<div class="m">讀取中…</div>';
+    loadQuota();
+    await loadMessages(userId);
+  }
+
+  /** 體驗課表單資料：電話可以直接點擊撥打。 */
+  function renderFormBox(l) {
+    $('d-form').classList.toggle('hidden', !l.form);
+    if (!l.form) return;
+    $('d-form-title').textContent = `🔥 體驗課表單資料（${l.formAt} 收到）`;
+    $('d-form-body').innerHTML = l.form.split('\n').map((line) => {
+      const m = line.match(/^(.*?電話|.*?手機)：(.*)$/);
+      if (m) return `<div>${esc(m[1])}：<a href="tel:${esc(m[2].replace(/[^\d+]/g, ''))}">${esc(m[2])}</a></div>`;
+      return `<div>${esc(line)}</div>`;
+    }).join('');
+  }
+
+  async function loadMessages(userId) {
+    try {
+      const msgs = await call('getMessages', getToken(), userId);
+      if (!state.current || state.current.userId !== userId) return;
+      $('d-msgs').innerHTML = msgs.length ? msgs.map((m) => `
+        <div class="m ${m.outgoing ? 'out' : ''}">
+          <div class="at">${esc(m.at)}${m.outgoing ? '・↩ ' + esc(m.sender || '網頁回覆') : ''}</div>
+          <div class="c">${esc(m.content)}</div>
+        </div>`).join('')
+        : '<div class="m">沒有訊息紀錄</div>';
+    } catch (err) {
+      $('d-msgs').innerHTML = `<div class="m">讀取失敗：${esc(err.message)}</div>`;
+    }
+  }
+
+  // ── 回覆家長 ──
+
+  const SENDER_KEY = 'funrobot_reply_sender';
+  function getSender() { try { return localStorage.getItem(SENDER_KEY) || ''; } catch (e) { return ''; } }
+  function setSender(v) { try { localStorage.setItem(SENDER_KEY, v); } catch (e) {} }
+
+  async function loadQuota() {
+    if (state.quota === undefined) {
+      try { state.quota = await call('getQuota', getToken()); } catch (e) { state.quota = null; }
+    }
+    const q = state.quota;
+    $('r-quota').textContent = q
+      ? `本月 LINE 訊息已用 ${q.used}${q.limited ? ' ／ ' + q.limit : ''} 則。從這裡回覆會用掉 1 則；在 LINE 官方帳號後台聊天回覆不計。`
+      : '從這裡回覆會計入官方帳號每月訊息則數；在 LINE 官方帳號後台聊天回覆不計。';
+  }
+
+  $('r-send').addEventListener('click', async () => {
+    const l = state.current;
+    if (!l) return;
+    const text = $('r-text').value.trim();
+    const sender = $('r-sender').value.trim();
+    $('r-err').textContent = '';
+    if (!text) { $('r-err').textContent = '請輸入要傳送的內容'; return; }
+    if (!sender) { $('r-err').textContent = '請填寫回覆者姓名'; $('r-sender').focus(); return; }
+    if (!confirm(`確定要以官方帳號傳送給「${l.nickname || l.name}」？\n\n${text}`)) return;
+    setSender(sender);
+    $('r-send').disabled = true;
+    try {
+      await call('sendReply', getToken(), l.userId, text, sender);
+      $('r-text').value = '';
+      state.quota = undefined;
+      loadQuota();
+      await loadMessages(l.userId);
+      await load(); // 更新待回覆數字與進度（詢問中會自動改成已回覆）
+      const updated = state.data.leads.find((x) => x.userId === l.userId);
+      if (updated && state.current) {
+        state.current = updated;
+        state.stage = updated.stage;
+        renderStagePick();
+      }
+    } catch (err) {
+      $('r-err').textContent = err.message;
+    } finally {
+      $('r-send').disabled = false;
+    }
+  });
+
+  function closeDrawer() {
+    state.current = null;
+    $('drawer').classList.add('hidden');
+    $('drawer-bg').classList.add('hidden');
+  }
+  $('d-close').addEventListener('click', closeDrawer);
+  $('drawer-bg').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeAlert(); closeDrawer(); } });
+
+  $('d-save').addEventListener('click', async () => {
+    const l = state.current;
+    if (!l) return;
+    $('d-save').disabled = true;
+    $('d-saved').textContent = '';
+    $('d-err').textContent = '';
+    try {
+      const updated = await call('updateLead', getToken(), l.userId, {
+        stage: state.stage,
+        nickname: $('d-nickname').value,
+        identity: $('d-identity').value,
+        campus: $('d-campus').value,
+        age: $('d-age').value,
+        trialDate: $('d-trial').value,
+        note: $('d-note').value,
+      });
+      const i = state.data.leads.findIndex((x) => x.userId === l.userId);
+      const merged = Object.assign({}, i >= 0 ? state.data.leads[i] : l, updated); // 保留待回覆等欄位
+      if (i >= 0) state.data.leads[i] = merged;
+      state.current = merged;
+      $('d-name').innerHTML = nameHtml(merged);
+      $('d-saved').textContent = '已儲存';
+      render();
+    } catch (err) {
+      $('d-err').textContent = err.message;
+    } finally {
+      $('d-save').disabled = false;
+    }
+  });
+
+  // 同一個分頁重新整理時，沿用尚未過期的登入
+  if (getToken()) load().catch(() => showLogin()); else showLogin();
+</script>
+</body>
+</html>
