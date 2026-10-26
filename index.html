@@ -78,6 +78,15 @@
   /* 待追蹤 */
   .stat.follow { --c: #c0392b; }
   .lead.overdue { border-left: 4px solid var(--warn); }
+  /* 體驗課 12 小時警示 */
+  .urgent { background: #b91c1c; color: #fff; padding: 12px 16px; animation: urgent-pulse 2s ease-in-out infinite; }
+  .urgent .title { max-width: 1100px; margin: 0 auto 8px; font-size: 17px; font-weight: 700; }
+  .urgent .items { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; }
+  .urgent button { background: #fff; color: #b91c1c; border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; text-align: left; }
+  .urgent button small { display: block; font-weight: 400; color: #7f1d1d; }
+  @keyframes urgent-pulse { 0%, 100% { background: #b91c1c; } 50% { background: #dc2626; } }
+  .lead.urgent-card { border: 2px solid #b91c1c; border-left-width: 8px; background: #fef2f2; }
+  .tag.urgent-tag { background: #b91c1c; color: #fff; font-weight: 700; }
   /* 已填體驗課表單：最優先 */
   .lead.hot { border-left: 6px solid #e8590c; background: #fff4ec; }
   .tag.hot { background: #e8590c; color: #fff; font-weight: 700; }
@@ -175,6 +184,8 @@
     <button class="btn ghost" id="refresh">重新整理</button>
     <button class="btn ghost" id="logout">登出</button>
   </header>
+  <!-- 體驗課超過 12 小時沒處理：每個畫面最上方都看得到，處理完才會消失 -->
+  <div id="urgent" class="urgent hidden"></div>
   <main id="view-inbox" class="hidden">
     <div class="inbox-top">
       <span>在學家長傳來、還沒從這個網頁回覆的訊息，最新在最上面。貼圖、自動回應關鍵字（例：我要請假）不算待回覆。</span>
@@ -401,13 +412,51 @@
     return !!l.formTs && ['', '詢問中', '已回覆'].indexOf(l.stage) >= 0;
   }
 
-  /** 排序用：表單 2、其他待追蹤 1、其餘 0。 */
+  const URGENT_HOURS = 12;
+
+  /**
+   * 體驗課超過 12 小時沒處理的原因（沒有就回傳空字串）：
+   *  - 家長填了體驗課表單或提出體驗時間，12 小時後還沒約好（進度還在詢問中／已回覆）
+   *  - 已約試聽，但試聽時間過了 12 小時，進度還沒更新
+   */
+  function urgentReason(l) {
+    const now = Date.now();
+    if (['', '詢問中', '已回覆'].indexOf(l.stage) >= 0 && (l.formTs || l.trialSource === '家長提出')) {
+      const since = Math.max(l.formTs || 0, l.trialSource === '家長提出' ? (l.trialTs || l.lastTs || 0) : 0);
+      const h = Math.floor((now - since) / 3600000);
+      if (since && h >= URGENT_HOURS) return `體驗課預約 ${h} 小時沒有處理`;
+    }
+    if (l.stage === '已約試聽' && l.trialDate) {
+      const end = new Date(`${l.trialDate}T${l.trialTime || '23:59'}:00`).getTime();
+      const h = Math.floor((now - end) / 3600000);
+      if (!isNaN(h) && h >= URGENT_HOURS) return `體驗課已過 ${h} 小時，請更新進度`;
+    }
+    return '';
+  }
+
+  /** 排序用：12 小時警示 3、表單 2、其他待追蹤 1、其餘 0。 */
   function priority(l) {
-    return isHotForm(l) ? 2 : followUpReason(l) ? 1 : 0;
+    return urgentReason(l) ? 3 : isHotForm(l) ? 2 : followUpReason(l) ? 1 : 0;
+  }
+
+  /** 首頁最上方的紅色警示橫幅，不受篩選影響。 */
+  function renderUrgent() {
+    const items = state.data.leads
+      .map((l) => ({ l, reason: urgentReason(l) }))
+      .filter((x) => x.reason)
+      .sort((a, b) => b.l.lastTs - a.l.lastTs);
+    $('urgent').classList.toggle('hidden', !items.length);
+    if (!items.length) return;
+    $('urgent').innerHTML =
+      `<div class="title">🚨 ${items.length} 位家長的體驗課超過 ${URGENT_HOURS} 小時沒有處理，請馬上確認</div>` +
+      `<div class="items">${items.map(({ l, reason }) =>
+        `<button data-id="${esc(l.userId)}">${esc(l.nickname || l.name)}<small>${esc(reason)}${l.trialDate ? '・' + esc(trialText(l)) : ''}</small></button>`).join('')}</div>`;
   }
 
   /** 需要追蹤的原因；不需要追蹤時回傳空字串。 */
   function followUpReason(l) {
+    const urgent = urgentReason(l);
+    if (urgent) return '🚨 ' + urgent;
     if (isHotForm(l)) {
       const hours = Math.floor((Date.now() - l.formTs) / 3600000);
       return hours >= 2 ? `🔥 已填體驗課表單，${hours} 小時未安排` : '🔥 已填體驗課表單，請盡快聯絡';
@@ -456,19 +505,20 @@
     $('enrolled-badge').classList.toggle('on', idf === '在學');
 
     // 已填體驗課表單最前面，再來是其他待追蹤，其餘維持最後訊息時間新到舊
-    const rows = filtered().map((l) => ({ l, reason: followUpReason(l), hot: isHotForm(l) }));
+    renderUrgent();
+    const rows = filtered().map((l) => ({ l, reason: followUpReason(l), hot: isHotForm(l), urgent: !!urgentReason(l) }));
     rows.sort((a, b) => priority(b.l) - priority(a.l));
     const nFollow = rows.filter((r) => r.reason).length;
     const nHot = rows.filter((r) => r.hot).length;
     $('count').textContent = `共 ${rows.length} 位` +
       (nFollow ? `，其中 ${nFollow} 位待追蹤` + (nHot ? `（🔥 ${nHot} 位已填體驗課表單）` : '') + '，排在最前面' : '') +
       '；依最後訊息時間，最新在最上面';
-    $('list').innerHTML = rows.length ? rows.map(({ l, reason, hot }) => `
-      <div class="lead ${hot ? 'hot' : reason ? 'overdue' : ''}" data-id="${esc(l.userId)}">
+    $('list').innerHTML = rows.length ? rows.map(({ l, reason, hot, urgent }) => `
+      <div class="lead ${urgent ? 'urgent-card' : hot ? 'hot' : reason ? 'overdue' : ''}" data-id="${esc(l.userId)}">
         <div class="name">${nameHtml(l)}</div>
         <div class="time">${esc(l.lastAt)}</div>
         <div class="tags">
-          ${reason ? `<span class="tag ${hot ? 'hot' : 'alert'}">${hot ? '' : '⚠ '}${esc(reason)}</span>` : ''}
+          ${reason ? `<span class="tag ${urgent ? 'urgent-tag' : hot ? 'hot' : 'alert'}">${urgent || hot ? '' : '⚠ '}${esc(reason)}</span>` : ''}
           ${l.stage ? `<span class="tag stage ${stageClass(l.stage)}">${esc(l.stage)}</span>` : ''}
           ${childTags(l)}
           ${courseTags(l)}
@@ -570,6 +620,11 @@
     $('f-stage').value = FOLLOW_UP;
     render();
   });
+  $('urgent').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (b) openDrawer(b.dataset.id);
+  });
+
   $('alert-list').addEventListener('click', (e) => {
     const el = e.target.closest('.item');
     if (!el) return;
