@@ -149,11 +149,12 @@
   .confirm { margin-top: 8px; background: var(--brand-soft); border: 1px solid #fcd5b5; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
   .confirm .bar { justify-content: flex-end; }
   /* 對話：配色接近 LINE（藍灰底、家長白色泡泡、我方綠色泡泡） */
-  .chat .composer { background: #f7f7f7; border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; padding: 10px; }
+  .chat .composer { background: #f7f7f7; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); padding: 10px; }
   .chat .composer textarea { background: #fff; }
   .chat .composer .btn { background: #06c755; }
-  .thread { display: flex; flex-direction: column; gap: 10px; background: #8cabd8; padding: 14px 12px; min-height: 360px;
-    border-radius: 0 0 var(--radius) var(--radius); }
+  .thread { display: flex; flex-direction: column; gap: 10px; background: #8cabd8; padding: 14px 12px;
+    min-height: 300px; max-height: 60vh; overflow-y: auto; border-radius: var(--radius) var(--radius) 0 0; }
+  .thread .day { align-self: center; background: rgba(0,0,0,.18); color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 999px; }
   .thread .muted, .thread .err { color: #fff; text-align: center; }
   .msg-line { display: flex; align-items: flex-end; gap: 6px; max-width: 85%; }
   .msg-line.in { align-self: flex-start; }
@@ -305,7 +306,9 @@
 
         <!-- 對話：主要區塊，配色接近 LINE -->
         <div class="section chat">
-          <h3>💬 對話（最新在最上面）</h3>
+          <h3>💬 對話</h3>
+          <!-- 跟 LINE 一樣：舊訊息在上、最新在最下面，輸入框在對話下方 -->
+          <div class="thread" id="d-thread"></div>
           <div class="composer">
             <textarea id="r-text" placeholder="輸入要傳給家長的訊息，會以官方帳號傳到家長的 LINE…"></textarea>
             <div class="bar">
@@ -320,7 +323,6 @@
             <div class="hint muted" id="r-quota"></div>
             <div class="err" id="r-err"></div>
           </div>
-          <div class="thread" id="d-thread"></div>
         </div>
       </div>
     </section>
@@ -802,13 +804,23 @@
     try {
       const msgs = await call('getMessages', getToken(), userId);
       if (state.currentId !== userId) return;
-      // LINE 樣式：家長在左（白色），我方在右（綠色），時間在泡泡旁邊
-      $('d-thread').innerHTML = msgs.length ? msgs.map((m) => `
+      // LINE 樣式：舊的在上、最新在最下面；家長在左（白色），我方在右（綠色）；換日時顯示日期
+      const box = $('d-thread');
+      const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      let day = '';
+      box.innerHTML = msgs.length ? msgs.slice().reverse().map((m) => {
+        const d = m.at.slice(0, 10), t = m.at.slice(11);
+        const sep = d !== day ? `<div class="day">${esc(d.slice(5))}</div>` : '';
+        day = d;
+        return `${sep}
         <div class="msg-line ${m.outgoing ? 'out' : 'in'}">
           <div class="bubble">${esc(m.content)}</div>
-          <div class="msg-time">${m.outgoing ? esc(m.sender || '網頁回覆') + '<br>' : ''}${esc(m.at.slice(5))}</div>
-        </div>`).join('')
+          <div class="msg-time">${m.outgoing ? esc(m.sender || '網頁回覆') + '<br>' : ''}${esc(t)}</div>
+        </div>`;
+      }).join('')
         : '<div class="muted">還沒有訊息紀錄</div>';
+      // 打開時捲到最新；自動更新時，只有原本就在最下面才跟著捲（往上翻舊訊息時不打擾）
+      if (!silent || nearBottom) box.scrollTop = box.scrollHeight;
     } catch (err) {
       $('d-thread').innerHTML = `<div class="err">讀取失敗：${esc(err.message)}</div>`;
     }
